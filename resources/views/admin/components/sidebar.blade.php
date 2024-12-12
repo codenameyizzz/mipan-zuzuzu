@@ -8,6 +8,12 @@
       </a>
     </li><!-- End Dashboard Nav -->
 
+    <li class="nav-item">
+        <a class="nav-link collapsed" href="{{ route('data.questionnaire') }}">
+          <i class="bi bi-card-list"></i>
+          <span>Data Kuisioner</span>
+        </a>
+      </li><!-- End Register Page Nav -->
 
     <li class="nav-item">
       <a class="nav-link collapsed" href="{{ route('data.responden') }}">

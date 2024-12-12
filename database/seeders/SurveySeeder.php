@@ -304,5 +304,3 @@ class SurveySeeder extends Seeder
         }
     }
 }
-
-

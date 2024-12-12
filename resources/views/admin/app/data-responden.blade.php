@@ -12,6 +12,11 @@
         </tr>
     </thead>
     <tbody>
+        @if (count($datas) == 0)
+        <tr>
+            <td colspan="8" class="text-center">Data tidak ditemukan</td>
+        </tr>
+        @endif
         @foreach ($datas as $data => $d)
         @php
             $user = $d->User;

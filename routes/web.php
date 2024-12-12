@@ -51,12 +51,20 @@ Route::post('/logout', [AuthController::class, 'getLogout'])->name('logout');
 // Admin Routes
 Route::group(['middleware' => ['auth', 'role:admin']], function () {
     Route::get('/admin', [adminNavController::class, 'showDashboard'])->name('dashboard');
+    Route::get('/admin/questionnaire', [adminNavController::class, 'showQuestionnaire'])->name('data.questionnaire');
+    Route::get('/admin/questionnaire/data', [adminNavController::class, 'dataQuestionnaire'])->name('data.data-questionnaire');
+    Route::get('/admin/questionnaire/add', [adminNavController::class, 'addQuestionnaire'])->name('data.add-questionnaire');
+    Route::get('/admin/questionnaire/edit/{id}', [adminNavController::class, 'editQuestionnaire'])->name('data.edit-questionnaire');
+    Route::post('/admin/questionnaire', [adminNavController::class, 'postAddQuestionnaire'])->name('data.post-add-questionnaire');
+    Route::post('/admin/questionnaire/edit/{id}', [adminNavController::class, 'postEditQuestionnaire'])->name('data.post-edit-questionnaire');
+    Route::get('/admin/questionnaire/delete/{id}', [adminNavController::class, 'deleteQuestionnaire'])->name('data.delete-questionnaire');
+
     Route::get('/admin/responden', [adminNavController::class, 'showRespondens'])->name('data.responden');
     Route::get('/admin/responden/data', [adminNavController::class, 'dataResponden'])->name('data.data-responden');
     Route::get('/admin/statistik', [adminNavController::class, 'showStatistik'])->name('data.statistik');
     Route::get('/admin/unggah-data', [adminNavController::class, 'showUnggah'])->name('data.unggah');
     Route::get('/admin/unduh-data', [adminNavController::class, 'showUnduh'])->name('data.unduh');
-    Route::get('/admin/unduh-data/csv', [adminNavController::class, 'unduhCSV'])->name('data.unduh-csv');
+    Route::get('/admin/unduh-data/csv/{survey_id}', [adminNavController::class, 'unduhCSV'])->name('data.unduh-data-csv');
     Route::get('/admin/panduan-form', [adminNavController::class, 'showPanduan'])->name('data.panduan');
     Route::get('/admin/faq', [adminNavController::class, 'showFAQ'])->name('data.faq');
     Route::get('/admin/contact', [adminNavController::class, 'showContact'])->name('data.contact');
