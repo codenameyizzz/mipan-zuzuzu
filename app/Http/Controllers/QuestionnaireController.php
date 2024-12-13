@@ -108,7 +108,6 @@ class QuestionnaireController extends Controller
             DB::commit();
             return redirect()->route('home')->with('success', 'Data berhasil disimpan');
         } catch (\Throwable $th) {
-            dd($th);
             DB::rollBack();
             return back()->with('error', 'Gagal menyimpan data');
         }

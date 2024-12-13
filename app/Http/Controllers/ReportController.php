@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 use App\Models\Answer;
+use App\Models\Mahasiswa;
 
 class ReportController extends Controller
 {
@@ -23,7 +24,7 @@ class ReportController extends Controller
     public function getProdi(Request $request)
     {
         $fakultas_id = $request->fakultas_id;
-        $prodi = Fakultas::find($fakultas_id)->Prodis;
+        $prodi = Prodi::where('fakultas_id', $fakultas_id)->get();
         return response()->json($prodi);
     }
 
@@ -111,76 +112,100 @@ class ReportController extends Controller
 
     public function getReport(Request $request)
     {
+        $fakultas_id = $request->fakultas_id;
         $prodi_id = $request->prodi_id;
         $angkatan = $request->angkatan;
 
-        // Query awal untuk jumlah mahasiswa tiap kategori
-        $jumlah_mahasiswa_tiap_kategori_query = Answer::select('type', DB::raw('count(*) as total'))
-            ->join('surveys', 'answers.survey_id', '=', 'surveys.id');
+        $mahasiswaData = Mahasiswa::where('fakultas_id', $fakultas_id);
 
-        // Tambahkan filter jika prodi_id atau angkatan diberikan
+        $jumlah_mahasiswa_tiap_kategori_query = Answer::select('surveys.type', DB::raw('count(DISTINCT answers.user_id, answers.survey_id) as total'))
+            ->join('surveys', 'answers.survey_id', '=', 'surveys.id')
+            ->join('mahasiswas', 'answers.user_id', '=', 'mahasiswas.user_id')
+            ->where('mahasiswas.fakultas_id', $fakultas_id);
+
         if ($prodi_id || $angkatan) {
-            $jumlah_mahasiswa_tiap_kategori_query = $jumlah_mahasiswa_tiap_kategori_query
-                ->join('mahasiswas', 'answers.user_id', '=', 'mahasiswas.user_id');
-
             if ($prodi_id) {
+                $mahasiswaData = $mahasiswaData->where('prodi_id', $prodi_id);
                 $jumlah_mahasiswa_tiap_kategori_query = $jumlah_mahasiswa_tiap_kategori_query->where('mahasiswas.prodi_id', $prodi_id);
             }
 
             if ($angkatan) {
+                $mahasiswaData = $mahasiswaData->where('angkatan', $angkatan);
                 $jumlah_mahasiswa_tiap_kategori_query = $jumlah_mahasiswa_tiap_kategori_query->where('mahasiswas.angkatan', $angkatan);
             }
         }
 
-        // Group by and fetch the results
-        $jumlah_mahasiswa_tiap_kategori = $jumlah_mahasiswa_tiap_kategori_query
-            ->groupBy('type')
-            ->pluck('total', 'type');
+        $totalMahasiswa = $mahasiswaData->count();
 
-        // Data untuk Pie Chart
+        $total_bekerja = $mahasiswaData->clone()->whereHas('User', function ($query) {
+            $query->whereHas('Answers', function ($query) {
+                $query->select('survey_id', 'user_id')
+                    ->distinct()
+                    ->whereHas('Survey', function ($query) {
+                        $query->where('type', 'bekerja');
+                    });
+            });
+        })->count();
+
+        $total_belum_bekerja = $mahasiswaData->clone()->whereHas('User', function ($query) {
+            $query->whereHas('Answers', function ($query) {
+                $query->select('survey_id', 'user_id')
+                    ->distinct()
+                    ->whereHas('Survey', function ($query) {
+                        $query->where('type', 'belum bekerja');
+                    });
+            });
+        })->count();
+
+        $total_wiraswasta = $mahasiswaData->clone()->whereHas('User', function ($query) {
+            $query->whereHas('Answers', function ($query) {
+                $query->select('survey_id', 'user_id')
+                    ->distinct()
+                    ->whereHas('Survey', function ($query) {
+                        $query->where('type', 'wiraswasta');
+                    });
+            });
+        })->count();
+
+        $total_melanjutkan_pendidikan = $mahasiswaData->clone()->whereHas('User', function ($query) {
+            $query->whereHas('Answers', function ($query) {
+                $query->select('survey_id', 'user_id')
+                    ->distinct()
+                    ->whereHas('Survey', function ($query) {
+                        $query->where('type', 'melanjutkan pendidikan');
+                    });
+            });
+        })->count();
+
+        $total_mencari_pekerjaan = $mahasiswaData->clone()->whereHas('User', function ($query) {
+            $query->whereHas('Answers', function ($query) {
+                $query->select('survey_id', 'user_id')
+                    ->distinct()
+                    ->whereHas('Survey', function ($query) {
+                        $query->where('type', 'mencari pekerjaan');
+                    });
+            });
+        })->count();
+
+        $data_jumlah_mahasiswa_tiap_kategori = [
+            'bekerja' => $total_bekerja,
+            'belum bekerja' => $total_belum_bekerja,
+            'wiraswasta' => $total_wiraswasta,
+            'melanjutkan pendidikan' => $total_melanjutkan_pendidikan,
+            'mencari pekerjaan' => $total_mencari_pekerjaan,
+        ];
+
         $data['jumlah_mahasiswa_tiap_kategori'] = [
-            'labels' => $jumlah_mahasiswa_tiap_kategori->keys(),
-            'data' => $jumlah_mahasiswa_tiap_kategori->values(),
+            'labels' => ['bekerja', 'belum bekerja', 'wiraswasta', 'melanjutkan pendidikan', 'mencari pekerjaan'],
+            'data' => $data_jumlah_mahasiswa_tiap_kategori
         ];
 
-        $total_responses = $jumlah_mahasiswa_tiap_kategori->sum();
-
-        // Data proporsi untuk Pie Chart dalam persentase
-        $data['proporsi_mahasiswa_tiap_kategori'] = [
-            'labels' => $jumlah_mahasiswa_tiap_kategori->keys(),
-            'data' => $jumlah_mahasiswa_tiap_kategori->map(function ($value) use ($total_responses) {
-                return round(($value / $total_responses) * 100, 2);
-            })->values(),
+        //perbandingan total mahasiswa dengan jumlah mahasiswa yang mengisi survey
+        $data['perbandingan_pengisian_questioner'] = [
+            'labels' => ['total mahasiswa', 'total mahasiswa yang mengisi'],
+            'data' => [$totalMahasiswa, array_sum($data_jumlah_mahasiswa_tiap_kategori)]
         ];
 
-        // Query awal untuk data berdasarkan angkatan
-        $grouped_data_query = Answer::select('surveys.type', 'mahasiswas.angkatan', DB::raw('count(*) as total'))
-            ->join('surveys', 'answers.survey_id', '=', 'surveys.id')
-            ->join('mahasiswas', 'answers.user_id', '=', 'mahasiswas.user_id');
-
-        // Tambahkan filter jika prodi_id atau angkatan diberikan
-        if ($prodi_id) {
-            $grouped_data_query = $grouped_data_query->where('mahasiswas.prodi_id', $prodi_id);
-        }
-
-        if ($angkatan) {
-            $grouped_data_query = $grouped_data_query->where('mahasiswas.angkatan', $angkatan);
-        }
-
-        // Group by and fetch the results
-        $grouped_data = $grouped_data_query
-            ->groupBy('surveys.type', 'mahasiswas.angkatan')
-            ->get()
-            ->groupBy('angkatan');
-
-        // Data untuk Grouped Bar Chart
-        $data['berdasarkan_angkatan'] = [
-            'labels' => $grouped_data->keys(),
-            'data' => $grouped_data->map(function ($angkatanGroup) {
-                return $angkatanGroup->pluck('total', 'type');
-            }),
-        ];
-        // Return hasil sebagai respons JSON
         $messages = [
             'status' => 'success',
             'html' => view('report-data', $data)->render(),
